@@ -163,19 +163,22 @@ Module imports without error. `world`, all five components, and `UNIT_NAMES` are
 
 Export `function initUnits(): void`.
 
+- Guard: if called a second time, throw `Error('initUnits already called')`.
 - Creates exactly 20 000 entities using `addEntity(world)`.
 - Adds `Position`, `Health`, `TeamComp`, `StatusComp`, `UnitMeta` to each.
-- Team A: entities 0–9 999. Team B: entities 10 000–19 999.
+- Team A: entities 0–9 999. Team B: entities 10 000–19 999. bitecs assigns sequential IDs starting at 0 when entities are created in order with no deletions — `nameIndex = eid` is valid for this usage.
 - Position: random `x ∈ [0, 2000]`, `y ∈ [0, 2000]`, `f32`.
 - Health: `max = 100`, `current = random 0–100`.
 - Status: `IDLE`.
 - `nameIndex = eid` (entity id is its own name index).
 
-Export `function buildSnapshot(): UnitSnapshot[]` — iterates all 20 000 entities and returns the full unit array. Called once on client connect.
+Export `liveEntities: number[]` — mutable array of all non-dead entity IDs, populated by `initUnits()`. Systems read and splice from this array; the attack system removes an eid when it kills a unit. This avoids O(n) filtering on every system call.
+
+Export `function buildSnapshot(): UnitSnapshot[]` — iterates all 20 000 entities and returns the full unit array. Called once on client connect. Must be called after `initUnits()`.
 
 **Done when**
 
-`initUnits()` runs without error. `buildSnapshot()` returns an array of exactly 20 000 items with correct types.
+`initUnits()` runs without error. Second call throws. `buildSnapshot()` returns an array of exactly 20 000 items with correct types. `liveEntities.length === 20000` after init.
 
 ---
 
@@ -185,11 +188,12 @@ Export `function buildSnapshot(): UnitSnapshot[]` — iterates all 20 000 entiti
 
 **What to do**
 
-Export three pure system functions. Each receives the dirty set and events array as out-parameters to mutate.
+Export three pure system functions. Each receives the dirty set and events array as out-parameters to mutate. All three use the exported `liveEntities` array from `init.ts` — never iterate all 20k entities to find live ones.
 
 ### `runMoveSystem(dirty: Set<number>, count: number): void`
 
-- Picks `count` live (non-dead) entities at random.
+- Clamp: `const actual = Math.min(count, liveEntities.length)`.
+- Picks `actual` distinct live entities at random (Fisher-Yates partial shuffle on `liveEntities`).
 - Moves each: `x += (Math.random() - 0.5) * 20`, `y += (Math.random() - 0.5) * 20`.
 - Clamps x and y to `[0, 2000]`.
 - Sets `StatusComp.value[eid] = STATUS.MOVING`.
@@ -197,22 +201,23 @@ Export three pure system functions. Each receives the dirty set and events array
 
 ### `runAttackSystem(dirty: Set<number>, events: GameEvent[], count: number): void`
 
-- Picks `count` live entities at random.
-- For each attacker, scans all entities (O(n) linear scan — acceptable at 1s interval, see trade-off note in README).
+- Clamp: `const actual = Math.min(count, liveEntities.length)`.
+- Picks `actual` distinct live entities at random as attackers.
+- For each attacker, scans **all 20k entities** (O(n) linear scan — acceptable at 1s interval, see trade-off note in README). Skip entities where `StatusComp.value[candidate] === STATUS.DEAD` — dead units must not be targeted.
 - Finds the nearest alive enemy (opposite team) within radius 200.
-- If found: subtract `10 + rand(0,20)` from `Health.current[target]`.
-- Sets attacker status to `ATTACKING`, target status to `ATTACKING`.
-- Adds both to `dirty`. Pushes `attack` event.
-- If target hp ≤ 0: set `Health.current[target] = 0`, status `DEAD`, push `destroyed` event.
+- **Only if a target is found:** subtract `10 + Math.floor(Math.random() * 20)` from `Health.current[target]`. Set both attacker and target status to `ATTACKING`. Add both to `dirty`. Push `attack` event.
+- If `Health.current[target] <= 0`: clamp to `Health.current[target] = 0`, set status `DEAD`, push `destroyed` event. Remove target from `liveEntities` (splice by value).
+- If no target within radius: attacker status is left unchanged (do not set ATTACKING when nothing was hit).
 
 ### `runIdleSystem(dirty: Set<number>, count: number): void`
 
-- Picks `count` live entities.
+- Clamp: `const actual = Math.min(count, liveEntities.length)`.
+- Picks `actual` live entities.
 - Sets status to `IDLE`. Adds to `dirty`.
 
 **Done when**
 
-All three functions are exported and typed. Each mutates only the dirty set, events array, and ECS component arrays — no other side effects.
+All three functions are exported and typed. Each mutates only the dirty set, events array, `liveEntities`, and ECS component arrays — no other side effects. When fewer live units exist than `count`, uses all available without error.
 
 ---
 
@@ -239,9 +244,12 @@ Export `function runCaptureSystem(events: GameEvent[]): void`:
 
 - For each zone, count alive units inside radius (O(20k) scan — 6 × 20k = 120k comparisons, negligible).
 - `inside = { [TEAM.A]: 0, [TEAM.B]: 0 }`.
-- Contested = both teams present → `progress` decrements by 1, min 0.
-- Uncontested + dominant team ≠ current owner → `progress++`.
-- If `progress >= 5` → set `zoneState.team = dominant`, reset `progress = 0`, push `capture` event.
+- **No units present** (both counts 0) → no change to progress or ownership.
+- **Contested** (both counts > 0) → `progress` decrements by 1, min 0.
+- **Uncontested** (exactly one team present): that team is dominant.
+  - If dominant team === current owner → no change.
+  - If dominant team ≠ current owner → `progress++`.
+  - If `progress >= 5` → set `zoneState.team = dominant`, reset `progress = 0`, push `capture` event.
 
 **Done when**
 
@@ -260,9 +268,10 @@ Export `class Ticker` with:
 ```ts
 class Ticker extends EventEmitter {
   private seq = 0
+  private intervalId: ReturnType<typeof setInterval> | null = null
 
-  start(): void   // begins setInterval(tick, 1000)
-  stop(): void    // clears interval
+  start(): void   // begins setInterval(tick, 1000); no-op if already running
+  stop(): void    // clears interval, sets intervalId to null
 
   private tick(): void
 }
@@ -272,35 +281,48 @@ class Ticker extends EventEmitter {
 
 ```ts
 private tick() {
-  const dirty = new Set<number>()
-  const events: GameEvent[] = []
+  try {
+    const dirty = new Set<number>()
+    const events: GameEvent[] = []
 
-  const total = 200 + Math.floor(Math.random() * 150)
-  const moveCount   = Math.floor(total * 0.5)
-  const attackCount = Math.floor(total * 0.35)
-  const idleCount   = total - moveCount - attackCount
+    const total = 200 + Math.floor(Math.random() * 150)
+    const moveCount   = Math.floor(total * 0.5)
+    const attackCount = Math.floor(total * 0.35)
+    const idleCount   = total - moveCount - attackCount
 
-  runMoveSystem(dirty, moveCount)
-  runAttackSystem(dirty, events, attackCount)
-  runIdleSystem(dirty, idleCount)
-  runCaptureSystem(events)
+    runMoveSystem(dirty, moveCount)
+    runAttackSystem(dirty, events, attackCount)
+    runIdleSystem(dirty, idleCount)
+    runCaptureSystem(events)
 
-  const payload: TickPayload = {
-    seq: this.seq++,
-    ts: Date.now(),
-    deltas: buildDeltas(dirty),
-    events,
+    const payload: TickPayload = {
+      seq: this.seq++,
+      ts: Date.now(),
+      deltas: buildDeltas(dirty),
+      events,
+    }
+
+    this.emit('tick', payload)
+  } catch (err) {
+    console.error('[Ticker] tick error:', err)
+    // interval continues — one bad tick must not stop the simulation
   }
-
-  this.emit('tick', payload)
 }
 ```
 
-Export `buildDeltas(dirty: Set<number>): UnitDelta[]` — maps each dirty eid to a `UnitDelta`.
+`start()` guard:
+```ts
+start() {
+  if (this.intervalId !== null) return
+  this.intervalId = setInterval(() => this.tick(), 1000)
+}
+```
+
+Export `buildDeltas(dirty: Set<number>): UnitDelta[]` — maps each dirty eid to a `UnitDelta` including all mutable fields (x, y, hp, status). HP is always the clamped value (never negative).
 
 **Done when**
 
-`ticker.start()` emits `'tick'` events at ~1s intervals. `ticker.stop()` stops emission. Payload matches `TickPayload` type.
+`ticker.start()` emits `'tick'` events at ~1s intervals. Calling `start()` twice does not double the tick rate. `ticker.stop()` stops emission. Payload matches `TickPayload` type.
 
 ---
 
@@ -317,10 +339,13 @@ Route: `GET /stream`
 On connect:
 1. Set headers: `Content-Type: text/event-stream`, `Cache-Control: no-cache`, `Connection: keep-alive`, `Access-Control-Allow-Origin: *`.
 2. Write snapshot immediately: `data: ${JSON.stringify(snapshotPayload)}\n\n`.
-3. Subscribe to `ticker` `'tick'` event — write each payload as `data: ${JSON.stringify(payload)}\n\n`.
-4. On `req.on('close')` — unsubscribe.
+3. Subscribe to `ticker` `'tick'` event — before each write check `res.writable`; skip the write and unsubscribe if false (client disconnected mid-tick).
+4. Write each tick payload as `data: ${JSON.stringify(payload)}\n\n`.
+5. On `req.on('close')` — unsubscribe from ticker.
 
 No library needed. Raw `res.write`.
+
+> **Seq gap on reconnect:** SSE reconnects automatically. The server sends a fresh snapshot on every new connection, which resets client state. The client's seq gap detector will fire once after reconnect (snapshot has no seq); this is expected and harmless.
 
 **Done when**
 
@@ -351,6 +376,17 @@ const querySchema = z.object({
   pageSize:  z.coerce.number().int().min(1).max(500).default(100),
 })
 ```
+
+After schema validation, apply cross-field check:
+```ts
+if (parsed.hpMin !== undefined && parsed.hpMax !== undefined && parsed.hpMin > parsed.hpMax) {
+  return res.status(400).json({ error: 'hpMin must be ≤ hpMax' })
+}
+```
+
+Name search must use `unit.name.toLowerCase().includes(search.toLowerCase())` — never `new RegExp(search)` (ReDoS risk with user-controlled input).
+
+If `page * pageSize` exceeds the filtered total, return `{ total, page, pageSize, units: [] }` — not an error.
 
 Response:
 ```ts
@@ -447,7 +483,7 @@ client/
   tsconfig.json
 ```
 
-`vite.config.ts` — proxy `/stream` and `/api` to `http://localhost:3001`.
+`vite.config.ts` — proxy `/stream`, `/units`, `/zones`, and `/health` to `http://localhost:3001`.
 
 Additional dependencies: `zustand`, `pixi.js@7`, `@tanstack/react-virtual`.
 
@@ -541,9 +577,23 @@ interface UnitsSlice {
 }
 ```
 
-`applyDeltas` — mutates the Map in place using Immer or manual replacement. Does **not** replace the Map reference unless necessary (avoids triggering all subscribers).
+`applyDeltas` — creates a new Map reference on every call so that Zustand subscribers (both React `useMemo` and Pixi's `useStore.subscribe`) detect the change:
 
-`applySnapshot` — replaces the Map entirely (called once on connect).
+```ts
+applyDeltas: (deltas) => set(state => {
+  const next = new Map(state.units)   // shallow copy — O(20k) at 1 tick/sec is acceptable
+  for (const d of deltas) {
+    const unit = next.get(d.id)
+    if (!unit) continue               // unknown ID — skip silently
+    next.set(d.id, { ...unit, ...d })
+  }
+  return { units: next }
+})
+```
+
+If using Immer, call `enableMapSet()` once at app startup before the store is created.
+
+`applySnapshot` — replaces the Map entirely (called once on connect and on SSE reconnect).
 
 `setFilter` — updates filter state. Derived filtered list is computed in a selector, not stored.
 
@@ -596,11 +646,11 @@ export function useSSE(): { connected: boolean; seq: number }
 ```
 
 - Opens `new EventSource('/stream')` on mount.
-- On `message`:
-  - If `data.type === 'snapshot'` → call `applySnapshot`, `setZones`.
+- On `message`: wrap the entire handler in `try/catch` — a malformed JSON payload must not crash the hook.
+  - If `data.type === 'snapshot'` → call `applySnapshot`, `applyZoneEvents`.
   - Else → call `applyDeltas`, `pushEvents`, `_incrementUpdateCount`.
 - Tracks `connected` state via `onopen` / `onerror`.
-- Tracks last received `seq` — logs a warning to console if gap detected (`seq !== prev + 1`).
+- Tracks last received `seq` — logs `console.warn('[SSE] seq gap detected — state will resync on next snapshot')` if `seq !== prev + 1`. No manual recovery needed; SSE reconnect sends a fresh snapshot.
 - Closes `EventSource` on unmount.
 
 **Done when**
@@ -626,6 +676,8 @@ const zoneControl = useMemo(() => ({
   B: zones.filter(z => z.team === TEAM.B).length,
 }), [zones])
 ```
+
+> `[units]` as a memo dependency works correctly because `applyDeltas` always returns a new Map reference (see FE-3). The memo recomputes exactly once per tick.
 
 Displays as a horizontal bar: `Team A: {aliveA} alive · Team B: {aliveB} alive · Destroyed: {destroyed} · Zones A/B: {zoneControl.A}/{zoneControl.B}`.
 
@@ -695,6 +747,8 @@ This component owns its own PixiJS application. It does **not** re-render via Re
 ### Initialisation (once, in `useEffect`)
 
 ```ts
+if (!canvasRef.current) return  // null guard — should never be null after mount
+
 const app = new PIXI.Application({
   width: canvasWidth,
   height: canvasHeight,
@@ -724,16 +778,25 @@ const dotTexture = app.renderer.generateTexture(g)
 
 Create all 20 000 sprites up front. Store in `sprites: PIXI.Sprite[]` ref indexed by entity id. Set initial position and tint from snapshot.
 
+The `useEffect` cleanup must destroy the Pixi app and unsubscribe from the store:
+```ts
+return () => {
+  unsubscribe()
+  app.destroy(true)  // true = destroy children and textures
+}
+```
+
 ### Tick updates
 
 Subscribe to the store's raw `units` Map via `useStore.subscribe` (not `useStore` — avoids React re-render):
 
 ```ts
-useStore.subscribe(
+const unsubscribe = useStore.subscribe(
   state => state.units,
   (units) => {
     for (const unit of units.values()) {
       const s = sprites[unit.id]
+      if (!s) continue  // bounds guard — unit.id outside 0–19999 would be undefined
       s.x = unit.x * scaleX
       s.y = unit.y * scaleY
       s.tint = unit.team === TEAM.A ? 0x4488ff : 0xff4444
@@ -747,7 +810,7 @@ useStore.subscribe(
 
 ### Zone overlays
 
-Draw zone circles as `PIXI.Graphics` on a separate layer (not in ParticleContainer). Update tint when zone ownership changes. This layer re-draws only on zone capture events.
+Draw zone circles as `PIXI.Graphics` on a separate layer (not in ParticleContainer). Each circle: semi-transparent fill (alpha 0.15) + solid stroke (alpha 0.8), coloured by owner (`0x4488ff` Team A / `0xff4444` Team B / `0x888888` neutral). This layer re-draws only on zone capture events — subscribe to `state.zones` separately from the units subscription.
 
 **Done when**
 
@@ -782,8 +845,10 @@ export function usePerf() {
         const frameTime = Math.round((now - frame.last) / frame.count)
         setPerfField('fps', fps)
         setPerfField('frameTime', frameTime)
-        if ((performance as any).memory) {
-          setPerfField('heapMb', Math.round((performance as any).memory.usedJSHeapSize / 1048576))
+        type PerfMemory = { usedJSHeapSize: number }
+        const mem = (performance as Performance & { memory?: PerfMemory }).memory
+        if (mem) {
+          setPerfField('heapMb', Math.round(mem.usedJSHeapSize / 1048576))
         }
         frame.count = 0
         frame.last = now
@@ -793,8 +858,9 @@ export function usePerf() {
     raf = requestAnimationFrame(loop)
 
     // API latency — PerformanceObserver on resource entries for /health
+    // Use 'health' (not '/health') — Vite proxy and browser may record the full origin URL
     const po = new PerformanceObserver(list => {
-      const entries = list.getEntries().filter(e => e.name.includes('/health'))
+      const entries = list.getEntries().filter(e => e.name.includes('health'))
       if (entries.length > 0) {
         setPerfField('apiLatencyMs', Math.round(entries[entries.length - 1].duration))
       }
@@ -837,7 +903,7 @@ Displays:
 
 Each metric renders with a colour indicator (green / amber / red) so health is legible at a glance.
 
-Panel is togglable (button in top-right corner). When closed, `usePerf` hook still runs but the panel DOM is not mounted. This ensures the monitor has zero rendering cost when hidden.
+Panel is togglable. The `open` boolean state lives in `App.tsx` (via `useState`) and is passed as a prop to `PerfMonitor`. When closed, the panel DOM is not mounted but `usePerf` still runs at the root level — ensuring zero rendering cost when hidden and uninterrupted metric collection.
 
 **Done when**
 
@@ -851,9 +917,12 @@ FPS counter reflects actual browser FPS. Heap shows a plausible MB value in Chro
 
 **What to do**
 
+Layout matches the design wireframe: map fills the left, panels stack on the right.
+
 ```tsx
 export default function App() {
   const { connected } = useSSE()
+  const [perfOpen, setPerfOpen] = useState(false)
   usePerf()
 
   if (!connected) return <div>Connecting…</div>
@@ -861,22 +930,29 @@ export default function App() {
   return (
     <div style={{ display: 'grid', gridTemplateRows: 'auto 1fr', height: '100vh' }}>
       <KpiBar />
-      <div style={{ display: 'grid', gridTemplateColumns: '320px 1fr 280px', overflow: 'hidden' }}>
-        <UnitList />
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 320px', overflow: 'hidden' }}>
+        {/* Left: tactical map takes all remaining width */}
         <TacticalMap />
-        <EventFeed />
+        {/* Right: panels stacked vertically */}
+        <div style={{ display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+          <UnitList />
+          <EventFeed />
+          <button onClick={() => setPerfOpen(o => !o)}>
+            {perfOpen ? 'Hide Perf' : 'Show Perf'}
+          </button>
+          {perfOpen && <PerfMonitor />}
+        </div>
       </div>
-      <PerfMonitor />
     </div>
   )
 }
 ```
 
-`useSSE` and `usePerf` are called once at the root level. No prop drilling — components read from the store directly.
+`useSSE` and `usePerf` are called once at the root level. No prop drilling — components read from the store directly. The perf toggle button sits above the panel in the right column.
 
 **Done when**
 
-App renders all four panels. SSE connects on load. Refreshing the page reconnects cleanly.
+App renders all panels. Map occupies the left column. SSE connects on load. Refreshing the page reconnects cleanly.
 
 ---
 
