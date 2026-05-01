@@ -4,6 +4,7 @@ import { STATUS, TEAM } from '../types.js'
 import type { UnitSnapshot } from '../types.js'
 
 export const liveEntities: number[] = []
+export const allEntities: number[] = []
 let initialised = false
 
 export function initUnits(): void {
@@ -27,12 +28,13 @@ export function initUnits(): void {
     UnitMeta.nameIndex[eid] = eid
 
     liveEntities.push(eid)
+    allEntities.push(eid)
   }
 }
 
 export function buildSnapshot(): UnitSnapshot[] {
   const result: UnitSnapshot[] = []
-  for (const eid of liveEntities) {
+  for (const eid of allEntities) {
     result.push({
       id: eid,
       x: Position.x[eid],
