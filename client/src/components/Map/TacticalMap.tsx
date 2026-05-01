@@ -2,6 +2,16 @@ import { useEffect, useRef } from 'react'
 import * as PIXI from 'pixi.js'
 import { useStore } from '../../store/index'
 import { TEAM, STATUS } from '../../types'
+import type { Unit, FilterState } from '../../types'
+
+function matchesFilter(unit: Unit, f: FilterState): boolean {
+  if (f.team !== 'all' && unit.team !== f.team) return false
+  if (f.status !== 'all' && unit.status !== f.status) return false
+  const hpPct = unit.maxHp > 0 ? (unit.hp / unit.maxHp) * 100 : 0
+  if (hpPct < f.hpMin || hpPct > f.hpMax) return false
+  if (f.search && !unit.name.includes(f.search)) return false
+  return true
+}
 
 const MAP_W = 2000
 const MAP_H = 2000
@@ -47,8 +57,8 @@ export function TacticalMap() {
       g.fill({ color: 0xffffff })
       const dotTexture = app.renderer.generateTexture(g)
 
-      // ParticleContainer for units
-      const container = new PIXI.ParticleContainer()
+      // ParticleContainer for units — color must be dynamic so alpha/tint updates upload every frame
+      const container = new PIXI.ParticleContainer({ dynamicProperties: { color: true } })
       app.stage.addChild(container)
 
       // Zone overlay
@@ -91,14 +101,14 @@ export function TacticalMap() {
       drawZones()
 
       unsubUnits = useStore.subscribe((state) => {
-        const units = state.units
+        const { units, filter } = state
         for (const unit of units.values()) {
           const p = particles[unit.id]
           if (!p) continue
           p.x = unit.x * scaleX
           p.y = unit.y * scaleY
           p.tint = unit.team === TEAM.A ? 0x4488ff : 0xff4444
-          p.alpha = unit.status === STATUS.DEAD ? 0.15 : 1
+          p.alpha = !matchesFilter(unit, filter) ? 0 : unit.status === STATUS.DEAD ? 0.15 : 1
         }
       })
 
