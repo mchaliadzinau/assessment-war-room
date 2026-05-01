@@ -27,12 +27,13 @@ export function TacticalMap() {
     let unsubUnits: (() => void) | null = null
     let unsubZones: (() => void) | null = null
     let destroyed = false
+    let ro: ResizeObserver | null = null
 
     ;(async () => {
       const canvasWidth  = el.clientWidth  || 800
       const canvasHeight = el.clientHeight || 600
-      const scaleX = canvasWidth  / MAP_W
-      const scaleY = canvasHeight / MAP_H
+      let scaleX = canvasWidth  / MAP_W
+      let scaleY = canvasHeight / MAP_H
 
       app = new PIXI.Application()
       await app.init({
@@ -116,10 +117,30 @@ export function TacticalMap() {
       unsubZones = useStore.subscribe((state) => state.zones, () => {
         drawZones()
       })
+
+      ro = new ResizeObserver((entries) => {
+        if (!app) return
+        const { width, height } = entries[0].contentRect
+        if (width === 0 || height === 0) return
+        scaleX = width  / MAP_W
+        scaleY = height / MAP_H
+        app.renderer.resize(width, height)
+        const { units, filter } = useStore.getState()
+        for (const unit of units.values()) {
+          const p = particles[unit.id]
+          if (!p) continue
+          p.x = unit.x * scaleX
+          p.y = unit.y * scaleY
+          p.alpha = !matchesFilter(unit, filter) ? 0 : unit.status === STATUS.DEAD ? 0.15 : 1
+        }
+        drawZones()
+      })
+      ro.observe(el)
     })()
 
     return () => {
       destroyed = true
+      if (ro) ro.disconnect()
       if (unsubUnits) unsubUnits()
       if (unsubZones) unsubZones()
       // TODO fix Uncaught TypeError: this._cancelResize is not a function
