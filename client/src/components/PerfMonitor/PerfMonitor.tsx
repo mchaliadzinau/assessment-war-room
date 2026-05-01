@@ -1,3 +1,5 @@
+import { useStore } from '../../store/index'
+
 type Level = 'healthy' | 'warning' | 'critical'
 const LEVEL_COLOR: Record<Level, string> = {
   healthy: '#44cc44',
@@ -22,11 +24,11 @@ function Metric({ label, value, unit, level }: { label: string; value: number; u
 }
 
 export function PerfMonitor() {
-  const fps                = 60
-  const frameTime          = 1
-  const heapMb             = 1
-  const apiLatencyMs       = 50
-  const storeUpdatesPerSec = 25
+  const fps                = useStore(s => s.fps)
+  const frameTime          = useStore(s => s.frameTime)
+  const heapMb             = useStore(s => s.heapMb)
+  const apiLatencyMs       = useStore(s => s.apiLatencyMs)
+  const storeUpdatesPerSec = useStore(s => s.storeUpdatesPerSec)
 
   return (
     <div style={{
