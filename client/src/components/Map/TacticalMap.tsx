@@ -112,7 +112,8 @@ export function TacticalMap() {
       destroyed = true
       if (unsubUnits) unsubUnits()
       if (unsubZones) unsubZones()
-      if (app) app.destroy(true)
+      // TODO fix Uncaught TypeError: this._cancelResize is not a function
+      // if (app) app.destroy(true)
     }
   }, [])
 
