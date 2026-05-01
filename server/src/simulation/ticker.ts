@@ -1,6 +1,6 @@
 import { EventEmitter } from 'events'
-import { runMoveSystem } from './systems.js'
-import { Position, StatusComp } from './world.js'
+import { runMoveSystem, runAttackSystem, runIdleSystem } from './systems.js'
+import { Position, Health, StatusComp } from './world.js'
 import type { TickPayload, UnitDelta, GameEvent } from '../types.js'
 
 export const TICK_INTERVAL_MS = Number(process.env.TICK_INTERVAL_MS ?? 1000)
@@ -14,6 +14,7 @@ export function buildDeltas(dirty: Set<number>): UnitDelta[] {
       id: eid,
       x: Position.x[eid],
       y: Position.y[eid],
+      hp: Math.max(0, Health.current[eid]),
       status: StatusComp.value[eid] as UnitDelta['status'],
     })
   }
@@ -40,9 +41,14 @@ export class Ticker extends EventEmitter {
     try {
       const dirty = new Set<number>()
       const events: GameEvent[] = []
-      const moveCount = UNITS_PER_TICK + Math.floor(Math.random() * UNITS_PER_TICK_JITTER)
+      const total = UNITS_PER_TICK + Math.floor(Math.random() * UNITS_PER_TICK_JITTER)
+      const moveCount   = Math.floor(total * 0.5)
+      const attackCount = Math.floor(total * 0.35)
+      const idleCount   = total - moveCount - attackCount
 
       runMoveSystem(dirty, moveCount)
+      runAttackSystem(dirty, events, attackCount)
+      runIdleSystem(dirty, idleCount)
 
       const payload: TickPayload = {
         seq: this.seq++,

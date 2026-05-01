@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { useSSE } from './hooks/useSSE'
+import { usePerf } from './hooks/usePerf'
 import { KpiBar } from './components/KpiBar/KpiBar'
 import { TacticalMap } from './components/Map/TacticalMap'
 import { UnitList } from './components/UnitList/UnitList'
@@ -9,6 +10,7 @@ import { PerfMonitor } from './components/PerfMonitor/PerfMonitor'
 export default function App() {
   const { connected } = useSSE()
   const [perfOpen, setPerfOpen] = useState(false)
+  usePerf()
 
   if (!connected) {
     return (

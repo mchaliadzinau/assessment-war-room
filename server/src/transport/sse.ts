@@ -1,5 +1,6 @@
 import type { Express, Request, Response } from 'express'
 import { buildSnapshot } from '../simulation/init.js'
+import { ZONES, zoneStates } from '../simulation/capture.js'
 import type { Ticker } from '../simulation/ticker.js'
 import type { SnapshotPayload, TickPayload } from '../types.js'
 
@@ -13,7 +14,11 @@ export function registerSseRoute(app: Express, ticker: Ticker): void {
     const snapshot: SnapshotPayload = {
       type: 'snapshot',
       units: buildSnapshot(),
-      zones: [],
+      zones: zoneStates.map((z, i) => ({
+        ...ZONES[i],
+        team: z.team,
+        progress: z.progress,
+      })),
     }
     res.write(`data: ${JSON.stringify(snapshot)}\n\n`)
 
