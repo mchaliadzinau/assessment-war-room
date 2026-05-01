@@ -1,5 +1,6 @@
 import { EventEmitter } from 'events'
 import { runMoveSystem, runAttackSystem, runIdleSystem } from './systems.js'
+import { runCaptureSystem } from './capture.js'
 import { Position, Health, StatusComp } from './world.js'
 import type { TickPayload, UnitDelta, GameEvent } from '../types.js'
 
@@ -49,6 +50,7 @@ export class Ticker extends EventEmitter {
       runMoveSystem(dirty, moveCount)
       runAttackSystem(dirty, events, attackCount)
       runIdleSystem(dirty, idleCount)
+      runCaptureSystem(events)
 
       const payload: TickPayload = {
         seq: this.seq++,
