@@ -30,19 +30,17 @@ export function TacticalMap() {
     let ro: ResizeObserver | null = null
 
     ;(async () => {
-      const canvasWidth  = el.clientWidth  || 800
-      const canvasHeight = el.clientHeight || 600
-      let scaleX = canvasWidth  / MAP_W
-      let scaleY = canvasHeight / MAP_H
-
       app = new PIXI.Application()
       await app.init({
-        width: canvasWidth,
-        height: canvasHeight,
+        resizeTo: el,
         backgroundColor: 0x0a0a0f,
         antialias: false,
         resolution: window.devicePixelRatio ?? 1,
+        autoDensity: true,
       })
+
+      let scaleX = app.screen.width  / MAP_W
+      let scaleY = app.screen.height / MAP_H
 
       if (destroyed) {
         if (app) app.destroy(true)
@@ -124,7 +122,6 @@ export function TacticalMap() {
         if (width === 0 || height === 0) return
         scaleX = width  / MAP_W
         scaleY = height / MAP_H
-        app.renderer.resize(width, height)
         const { units, filter } = useStore.getState()
         for (const unit of units.values()) {
           const p = particles[unit.id]
