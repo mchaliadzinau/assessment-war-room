@@ -7,14 +7,14 @@ export const liveEntities: number[] = []
 export const allEntities: number[] = []
 let initialised = false
 
-const TOTAL_UNITS = Math.max(1, parseInt(process.env.TOTAL_UNITS ?? '20000', 10))
-const TEAM_A_UNITS = Math.max(0, parseInt(process.env.TEAM_A_UNITS ?? String(Math.floor(TOTAL_UNITS / 2)), 10))
+const UNITS_TOTAL = Math.max(1, parseInt(process.env.UNITS_TOTAL ?? '20000', 10))
+const TEAM_A_UNITS = Math.max(0, parseInt(process.env.TEAM_A_UNITS ?? String(Math.floor(UNITS_TOTAL / 2)), 10))
 
 export function initUnits(): void {
   if (initialised) throw new Error('initUnits already called')
   initialised = true
 
-  for (let i = 0; i < TOTAL_UNITS; i++) {
+  for (let i = 0; i < UNITS_TOTAL; i++) {
     const eid = addEntity(world)
     addComponent(world, Position, eid)
     addComponent(world, Health, eid)
