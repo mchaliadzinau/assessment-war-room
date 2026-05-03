@@ -1,12 +1,12 @@
 import { Position, Health, TeamComp, StatusComp } from './world.js'
-import { liveEntities } from './init.js'
+import { liveEntities, UNITS_TOTAL } from './init.js'
 import { ZONES, zoneStates } from './capture.js'
 import { STATUS } from '../types.js'
 
 export const HEAL_IDLE_TICKS = Math.max(1, parseInt(process.env.HEAL_IDLE_TICKS ?? '3', 10))
 export const HEAL_AMOUNT     = Math.max(1, parseInt(process.env.HEAL_AMOUNT     ?? '5',  10))
 
-const idleTickCount = new Uint16Array(20_000)
+const idleTickCount = new Uint16Array(UNITS_TOTAL)
 
 export function runHealSystem(dirty: Set<number>): void {
   for (const eid of liveEntities) {

@@ -45,7 +45,7 @@ Both apps are started independently. Run server first — the client proxies `/s
 ### Client
 
 - **Zustand store** (`src/store/`): Three slices — units, events, perf. `applyDeltas` always produces a **new `Map` reference** (via `new Map(state.units)` + mutations) so both React `useMemo` and Pixi's `useStore.subscribe` fire on every tick.
-- **PixiJS map** (`src/components/Map/TacticalMap.tsx`): Initialised once in `useEffect`. Uses `PIXI.ParticleContainer` (20k sprites, one WebGL draw call). Subscribes to the store via `useStore.subscribe` — bypasses React's render cycle entirely. Cleans up with `app.destroy(true)` on unmount.
+- **PixiJS map** (`src/components/Map/TacticalMap.tsx`): Initialised once in `useEffect`. Uses `PIXI.ParticleContainer` (20k sprites, one WebGL draw call). Subscribes to the store via `useStore.subscribe` — bypasses React's render cycle entirely. Cleans up with `app.destroy(true)` on unmount. Canvas sizing is managed by a `ResizeObserver` (not `resizeTo`) — on every resize it calls `app.renderer.resize`, recalculates `scaleX`/`scaleY`, and repositions all particles in one pass. `autoDensity: true` + `resolution: devicePixelRatio` handle retina sharpness.
 - **TanStack Virtual** (`src/components/UnitList/`): Virtualises the 20k-row unit list — only ~15 rows rendered at a time.
 - **`usePerf`** (`src/hooks/usePerf.ts`): Runs at App root level always. Accumulates FPS/heap into refs and flushes to store every 500ms — 2 re-renders/sec instead of 60. PerfMonitor visibility is toggled via `perfOpen` state in `App.tsx`.
 - **`useSSE`** (`src/hooks/useSSE.ts`): Single `EventSource` opened at App root. Snapshot resets the full Map; tick payloads call `applyDeltas`. All message parsing wrapped in try/catch.

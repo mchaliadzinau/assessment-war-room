@@ -27,9 +27,10 @@ export function TacticalMap() {
     let ro: ResizeObserver | null = null
 
     ;(async () => {
-      const cfg = await fetch('/config').then(r => r.json()) as { battlefieldW: number; battlefieldH: number }
+      const cfg = await fetch('/config').then(r => r.json()) as { battlefieldW: number; battlefieldH: number; unitsTotal: number }
       const MAP_W: number = cfg.battlefieldW
       const MAP_H: number = cfg.battlefieldH
+      const UNITS_TOTAL: number = cfg.unitsTotal
 
       app = new PIXI.Application()
       await app.init({
@@ -72,7 +73,7 @@ export function TacticalMap() {
       const particles: PIXI.Particle[] = []
       const initialUnits = useStore.getState().units
 
-      for (let i = 0; i < 20_000; i++) {
+      for (let i = 0; i < UNITS_TOTAL; i++) {
         const unit = initialUnits.get(i)
         const particle = new PIXI.Particle({
           texture: dotTexture,

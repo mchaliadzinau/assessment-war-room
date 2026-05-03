@@ -7,7 +7,7 @@ export const liveEntities: number[] = []
 export const allEntities: number[] = []
 let initialised = false
 
-const UNITS_TOTAL = Math.max(1, parseInt(process.env.UNITS_TOTAL ?? '20000', 10))
+export const UNITS_TOTAL = Math.min(20_000, Math.max(1, parseInt(process.env.UNITS_TOTAL ?? '20000', 10)))
 const UNITS_TEAM_A_COUNT = Math.max(0, parseInt(process.env.UNITS_TEAM_A_COUNT ?? String(Math.floor(UNITS_TOTAL / 2)), 10))
 const BATTLEFIELD_MAX = 10_000
 export const BATTLEFIELD_W = Math.min(Number(process.env.BATTLEFIELD_W ?? 2000), BATTLEFIELD_MAX)

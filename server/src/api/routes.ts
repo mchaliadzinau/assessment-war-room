@@ -1,6 +1,6 @@
 import { z } from 'zod'
 import type { Express, Request, Response } from 'express'
-import { buildSnapshot, BATTLEFIELD_W, BATTLEFIELD_H } from '../simulation/init.js'
+import { buildSnapshot, BATTLEFIELD_W, BATTLEFIELD_H, UNITS_TOTAL } from '../simulation/init.js'
 import { ZONES, zoneStates } from '../simulation/capture.js'
 import { STATUS, TEAM } from '../types.js'
 
@@ -20,7 +20,7 @@ const querySchema = z.object({
 
 export function registerApiRoutes(app: Express): void {
   app.get('/config', (_req: Request, res: Response) => {
-    res.json({ battlefieldW: BATTLEFIELD_W, battlefieldH: BATTLEFIELD_H })
+    res.json({ battlefieldW: BATTLEFIELD_W, battlefieldH: BATTLEFIELD_H, unitsTotal: UNITS_TOTAL })
   })
 
   app.get('/health', (_req: Request, res: Response) => {

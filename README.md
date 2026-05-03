@@ -55,7 +55,14 @@ cd client && npm test
 
 ### Server
 
-- **ECS with bitecs** — 20,000 units are stored in flat typed arrays (`Float32Array`, `Int32Array`) via the bitecs entity-component system. There are zero per-unit JS objects in the hot path; component access is `Position.x[eid]`. This keeps GC pressure negligible and tick throughput high even at 10 Hz.
+- **ECS with bitecs** — 20,000 units are stored in flat typed arrays (`Float32Array`, `Int32Array`, avoids strings in ECS) via the bitecs entity-component system. Zero per-entity heap allocation in the hot path. Access: `Position.x[eid]` → O(1). This keeps GC pressure negligible and tick throughput high even at 10 Hz.
+  - Attack system is the most resource heavy one (most comparisons per tick of any system) but it should run well at 1s tick:
+    O(n) scan for attack target lookup is ~7M comparisons/tick (350 × 20,000 = 7,000,000 comparisons). A single comparison is just arithmetic. Modern JS engines execute these at roughly 1 billion simple operations per second. Currently the budget is 1,000ms (1s tick). Spending 5ms of it on the scan is 0.5% of the budget. The other 995ms the server is idle. 
+    Optimizations like Spatial Index is not necessary at this point, but should be relatively easy to implement given that systems are isolated.
+  - Capture system's zone membership check (6 × 20k = 120k comparisons) is an order of magnitude cheaper than the Attack system.
+  - Heal system   The inner zone loop (6 iterations) only fires for units that are IDLE and have accumulated ≥ HEAL_IDLE_TICKS consecutive idle ticks. In the true worst case
+   — all 20,000 units idle and eligible — that adds another 20,000 × 6 = 120,000 zone distance checks on top.
+
 
 - **`liveEntities` shared array** — a single mutable `number[]` holds every non-dead entity ID. All three systems (move, attack, idle/heal) iterate over this instead of scanning all 20k slots each tick. When a unit dies, the attack system splices it out immediately, keeping the iteration set small as the battle progresses.
 
