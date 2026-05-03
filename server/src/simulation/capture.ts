@@ -1,7 +1,7 @@
-import { Position, StatusComp, TeamComp } from './world.js'
-import { STATUS, TEAM } from '../types.js'
+import { Position, TeamComp } from './world.js'
+import { TEAM } from '../types.js'
 import type { ZoneDefinition, ZoneState, GameEvent } from '../types.js'
-import { BATTLEFIELD_W, BATTLEFIELD_H } from './init.js'
+import { BATTLEFIELD_W, BATTLEFIELD_H, liveEntities } from './init.js'
 
 // Zone positions as fractions of battlefield dimensions; r as fraction of shorter axis
 type RelativeZone = { cx: number; cy: number; r: number; label: string }
@@ -37,14 +37,16 @@ export const ZONES: ZoneDefinition[] = buildZones()
 
 export const zoneStates: ZoneState[] = ZONES.map(z => ({ id: z.id, team: null, progress: 0 }))
 
+const CAPTURE_TICKS = Math.max(1, parseInt(process.env.CAPTURE_TICKS ?? '5', 10) || 5)
+const CAPTURE_CONTEST_PENALTY = Math.max(0, parseInt(process.env.CAPTURE_CONTEST_PENALTY ?? '1', 10) || 1)
+
 export function runCaptureSystem(events: GameEvent[]): void {
   for (let zi = 0; zi < ZONES.length; zi++) {
     const zone = ZONES[zi]
     const state = zoneStates[zi]
     const inside = { [TEAM.A]: 0, [TEAM.B]: 0 }
 
-    for (let i = 0; i < 20_000; i++) {
-      if (StatusComp.value[i] === STATUS.DEAD) continue
+    for (const i of liveEntities) {
       const dx = Position.x[i] - zone.cx
       const dy = Position.y[i] - zone.cy
       if (dx * dx + dy * dy <= zone.r * zone.r) {
@@ -58,7 +60,7 @@ export function runCaptureSystem(events: GameEvent[]): void {
     if (aIn === 0 && bIn === 0) continue
 
     if (aIn > 0 && bIn > 0) {
-      state.progress = Math.max(0, state.progress - 1)
+      state.progress = Math.max(0, state.progress - CAPTURE_CONTEST_PENALTY)
       continue
     }
 
@@ -66,7 +68,7 @@ export function runCaptureSystem(events: GameEvent[]): void {
     if (dominant === state.team) continue
 
     state.progress++
-    if (state.progress >= 5) {
+    if (state.progress >= CAPTURE_TICKS) {
       state.team = dominant
       state.progress = 0
       events.push({ type: 'capture', zone: zone.id, team: dominant })

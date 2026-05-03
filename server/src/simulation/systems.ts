@@ -34,8 +34,7 @@ export function runAttackSystem(dirty: Set<number>, events: GameEvent[], count: 
     let nearestDist = Infinity
     let target = -1
 
-    for (let i = 0; i < 20_000; i++) {
-      if (StatusComp.value[i] === STATUS.DEAD) continue
+    for (const i of liveEntities) {
       if (TeamComp.id[i] === attackerTeam) continue
       const dx = Position.x[i] - ax
       const dy = Position.y[i] - ay
