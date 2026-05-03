@@ -104,15 +104,32 @@ export function TacticalMap() {
       }
       drawZones()
 
-      unsubUnits = useStore.subscribe((state) => {
-        const { units, filter } = state
-        for (const unit of units.values()) {
-          const p = particles[unit.id]
-          if (!p) continue
-          p.x = unit.x * scaleX
-          p.y = unit.y * scaleY
-          p.tint = unit.team === TEAM.A ? 0x4488ff : 0xff4444
-          p.alpha = !matchesFilter(unit, filter) ? 0 : unit.status === STATUS.DEAD ? 0.15 : 1
+      unsubUnits = useStore.subscribe((state, prevState) => {
+        const { units, filter, lastDeltaIds } = state
+        const filterChanged = state.filter !== prevState.filter
+        const idsToUpdate = (!filterChanged && lastDeltaIds !== null)
+          ? lastDeltaIds
+          : null
+
+        if (idsToUpdate) {
+          for (const id of idsToUpdate) {
+            const unit = units.get(id)
+            const p = particles[id]
+            if (!unit || !p) continue
+            p.x = unit.x * scaleX
+            p.y = unit.y * scaleY
+            p.tint = unit.team === TEAM.A ? 0x4488ff : 0xff4444
+            p.alpha = !matchesFilter(unit, filter) ? 0 : unit.status === STATUS.DEAD ? 0.15 : 1
+          }
+        } else {
+          for (const unit of units.values()) {
+            const p = particles[unit.id]
+            if (!p) continue
+            p.x = unit.x * scaleX
+            p.y = unit.y * scaleY
+            p.tint = unit.team === TEAM.A ? 0x4488ff : 0xff4444
+            p.alpha = !matchesFilter(unit, filter) ? 0 : unit.status === STATUS.DEAD ? 0.15 : 1
+          }
         }
       })
 

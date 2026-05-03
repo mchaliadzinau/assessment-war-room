@@ -6,6 +6,8 @@ interface UnitsSlice {
   units: Map<number, Unit>
   zones: ZoneState[]
   filter: FilterState
+  /** IDs changed in the last tick. null = snapshot (full refresh needed). */
+  lastDeltaIds: number[] | null
   applySnapshot: (units: Unit[], zones: ZoneState[]) => void
   applyDeltas: (deltas: UnitDelta[]) => void
   applyZoneEvents: (events: GameEvent[]) => void
@@ -37,10 +39,12 @@ export const useStore = create<StoreState>()(subscribeWithSelector((set) => ({
   units: new Map(),
   zones: [],
   filter: { team: 'all', status: 'all', hpMin: 0, hpMax: 100, search: '' },
+  lastDeltaIds: null,
 
   applySnapshot: (units, zones) => set({
     units: new Map(units.map(u => [u.id, u])),
     zones,
+    lastDeltaIds: null,
   }),
 
   applyDeltas: (deltas) => set((state) => {
@@ -50,7 +54,7 @@ export const useStore = create<StoreState>()(subscribeWithSelector((set) => ({
       if (!unit) continue
       next.set(d.id, { ...unit, ...d })
     }
-    return { units: next }
+    return { units: next, lastDeltaIds: deltas.map(d => d.id) }
   }),
 
   applyZoneEvents: (events) => set((state) => {
