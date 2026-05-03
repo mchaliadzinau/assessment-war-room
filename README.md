@@ -57,7 +57,7 @@ cd client && npm test
 
 - **ECS with bitecs** — 20,000 units are stored in flat typed arrays (`Float32Array`, `Int32Array`, avoids strings in ECS) via the bitecs entity-component system. Zero per-entity heap allocation in the hot path. Access: `Position.x[eid]` → O(1). This keeps GC pressure negligible and tick throughput high even at 10 Hz.
   - Attack system is the most resource heavy one (most comparisons per tick of any system) but it should run well at 1s tick:
-    O(n) scan for attack target lookup is ~7M comparisons/tick (350 × 20,000 = 7,000,000 comparisons). A single comparison is just arithmetic. Modern JS engines execute these at roughly 1 billion simple operations per second. Currently the budget is 1,000ms (1s tick). Spending 5ms of it on the scan is 0.5% of the budget. The other 995ms the server is idle. 
+    O(n) scan for attack target lookup is ~3.5–4.5M comparisons/tick. Only 35% of `UNITS_PER_TICK` (500) become attackers — 175–227 per tick depending on jitter. Each scans all live units: 227 × 20,000 = 4.54M comparisons worst case. A single comparison is just arithmetic + one `Math.sqrt`. Modern JS engines execute these at roughly 1 billion simple operations per second; spending ~5ms of the 1,000ms tick budget on this is 0.5%.
     Optimizations like Spatial Index is not necessary at this point, but should be relatively easy to implement given that systems are isolated.
   - Capture system's zone membership check (6 × 20k = 120k comparisons) is an order of magnitude cheaper than the Attack system.
   - Heal system   The inner zone loop (6 iterations) only fires for units that are IDLE and have accumulated ≥ HEAL_IDLE_TICKS consecutive idle ticks. In the true worst case
@@ -76,7 +76,7 @@ cd client && npm test
 
 - **PixiJS ParticleContainer** — all 20,000 units are rendered as `PIXI.Particle` sprites in a single `ParticleContainer`, which issues one WebGL draw call per frame. DOM rendering for map dots is explicitly avoided; at this scale it would be unusable.
 
-- **`resizeTo` + `autoDensity`** — the PixiJS app uses `resizeTo: el` so the renderer owns canvas sizing, combined with `autoDensity: true` and `resolution: devicePixelRatio`. This produces sharp rendering on retina displays without manual canvas scaling math.
+- **`ResizeObserver` + `autoDensity`** — canvas sizing is driven by a `ResizeObserver`: on every resize it calls `app.renderer.resize`, then recalculates `scaleX`/`scaleY` and repositions all particles in one pass. `autoDensity: true` combined with `resolution: devicePixelRatio` produces sharp rendering on retina displays.
 
 - **Zustand store with new Map references** — `applyDeltas` always produces a `new Map(state.units)` so both React `useMemo` hooks and PixiJS's `useStore.subscribe` fire reliably on every tick. The PixiJS subscriber bypasses React's render cycle entirely — only KPI counts and the unit list trigger React re-renders.
 
