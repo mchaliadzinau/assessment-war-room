@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeAll, beforeEach } from 'vitest'
-import { ZONES, zoneStates, runCaptureSystem } from '../simulation/capture.js'
+import { ZONES, zoneStates, runCaptureSystem } from '../simulation/systems/capture.js'
 import { Position, StatusComp, TeamComp } from '../simulation/world.js'
 import { initUnits, liveEntities } from '../simulation/init.js'
 import { TEAM, STATUS } from '../types.js'

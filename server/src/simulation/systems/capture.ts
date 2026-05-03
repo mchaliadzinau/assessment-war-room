@@ -1,7 +1,7 @@
-import { Position, TeamComp } from './world.js'
-import { TEAM } from '../types.js'
-import type { ZoneDefinition, ZoneState, GameEvent } from '../types.js'
-import { BATTLEFIELD_W, BATTLEFIELD_H, liveEntities } from './init.js'
+import { Position, TeamComp } from '../world.js'
+import { TEAM } from '../../types.js'
+import type { ZoneDefinition, ZoneState, GameEvent } from '../../types.js'
+import { BATTLEFIELD_W, BATTLEFIELD_H, liveEntities } from '../init.js'
 
 // Zone positions as fractions of battlefield dimensions; r as fraction of shorter axis
 type RelativeZone = { cx: number; cy: number; r: number; label: string }

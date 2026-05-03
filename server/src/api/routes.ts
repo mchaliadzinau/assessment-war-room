@@ -1,7 +1,7 @@
 import { z } from 'zod'
 import type { Express, Request, Response } from 'express'
 import { buildSnapshot, BATTLEFIELD_W, BATTLEFIELD_H, UNITS_TOTAL } from '../simulation/init.js'
-import { ZONES, zoneStates } from '../simulation/capture.js'
+import { ZONES, zoneStates } from '../simulation/systems/capture.js'
 import { STATUS, TEAM } from '../types.js'
 
 const STATUS_MAP: Record<string, number> = {

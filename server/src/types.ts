@@ -32,6 +32,7 @@ export type GameEvent =
   | { type: 'attack';    attacker: number; target: number }
   | { type: 'destroyed'; unit: number; team: Team }
   | { type: 'capture';   zone: number; team: Team }
+  | { type: 'heal';      unit: number; amount: number }
 
 export type TickPayload = {
   seq: number

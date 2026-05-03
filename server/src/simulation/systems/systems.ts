@@ -1,7 +1,7 @@
-import { Position, Health, TeamComp, StatusComp } from './world.js'
-import { liveEntities, BATTLEFIELD_W, BATTLEFIELD_H } from './init.js'
-import { STATUS } from '../types.js'
-import type { GameEvent } from '../types.js'
+import { Position, Health, TeamComp, StatusComp } from '../world.js'
+import { liveEntities, BATTLEFIELD_W, BATTLEFIELD_H } from '../init.js'
+import { STATUS } from '../../types.js'
+import type { GameEvent } from '../../types.js'
 
 const UNITS_ATTACK_RADIUS_MAX = 500
 export const UNITS_ATTACK_RADIUS = Math.min(Number(process.env.UNITS_ATTACK_RADIUS ?? 200), UNITS_ATTACK_RADIUS_MAX)
@@ -50,7 +50,6 @@ export function runAttackSystem(dirty: Set<number>, events: GameEvent[], count: 
     const damage = 10 + Math.floor(Math.random() * 20)
     Health.current[target] = Math.max(0, Health.current[target] - damage)
     StatusComp.value[attacker] = STATUS.ATTACKING
-    StatusComp.value[target] = STATUS.ATTACKING
     dirty.add(attacker)
     dirty.add(target)
     events.push({ type: 'attack', attacker, target })

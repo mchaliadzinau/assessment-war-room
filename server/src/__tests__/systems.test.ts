@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeAll } from 'vitest'
 import { initUnits, liveEntities } from '../simulation/init.js'
-import { runMoveSystem, runAttackSystem, runIdleSystem } from '../simulation/systems.js'
+import { runMoveSystem, runAttackSystem, runIdleSystem } from '../simulation/systems/systems.js'
 import { Position, Health, StatusComp } from '../simulation/world.js'
 import { STATUS } from '../types.js'
 

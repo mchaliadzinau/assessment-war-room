@@ -1,7 +1,7 @@
-import { Position, Health, TeamComp, StatusComp } from './world.js'
-import { liveEntities, UNITS_TOTAL } from './init.js'
+import { Position, Health, TeamComp, StatusComp } from '../world.js'
+import { liveEntities, UNITS_TOTAL } from '../init.js'
 import { ZONES, zoneStates } from './capture.js'
-import { STATUS } from '../types.js'
+import { STATUS } from '../../types.js'
 
 export const HEAL_IDLE_TICKS = Math.max(1, parseInt(process.env.HEAL_IDLE_TICKS ?? '3', 10))
 export const HEAL_AMOUNT     = Math.max(1, parseInt(process.env.HEAL_AMOUNT     ?? '5',  10))
@@ -28,7 +28,8 @@ export function runHealSystem(dirty: Set<number>): void {
       const dx = px - zone.cx
       const dy = py - zone.cy
       if (dx * dx + dy * dy <= zone.r * zone.r) {
-        Health.current[eid] = Math.min(Health.current[eid] + HEAL_AMOUNT, Health.max[eid])
+        const healed = Math.min(HEAL_AMOUNT, Health.max[eid] - Health.current[eid])
+        Health.current[eid] += healed
         dirty.add(eid)
         break
       }

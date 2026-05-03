@@ -1,7 +1,7 @@
 import { EventEmitter } from 'events'
-import { runMoveSystem, runAttackSystem, runIdleSystem } from './systems.js'
-import { runCaptureSystem } from './capture.js'
-import { runHealSystem } from './heal.js'
+import { runMoveSystem, runAttackSystem, runIdleSystem } from './systems/systems.js'
+import { runCaptureSystem } from './systems/capture.js'
+import { runHealSystem } from './systems/heal.js'
 import { Position, Health, StatusComp } from './world.js'
 import type { TickPayload, UnitDelta, GameEvent } from '../types.js'
 

@@ -1,6 +1,6 @@
 import type { Express, Request, Response } from 'express'
 import { buildSnapshot } from '../simulation/init.js'
-import { ZONES, zoneStates } from '../simulation/capture.js'
+import { ZONES, zoneStates } from '../simulation/systems/capture.js'
 import type { Ticker } from '../simulation/ticker.js'
 import type { SnapshotPayload, TickPayload } from '../types.js'
 
