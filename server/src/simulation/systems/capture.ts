@@ -61,6 +61,7 @@ export function runCaptureSystem(events: GameEvent[]): void {
 
     if (aIn > 0 && bIn > 0) {
       state.progress = Math.max(0, state.progress - CAPTURE_CONTEST_PENALTY)
+      events.push({ type: 'contesting', zone: zone.id, progress: state.progress })
       continue
     }
 
@@ -72,6 +73,8 @@ export function runCaptureSystem(events: GameEvent[]): void {
       state.team = dominant
       state.progress = 0
       events.push({ type: 'capture', zone: zone.id, team: dominant })
+    } else {
+      events.push({ type: 'capturing', zone: zone.id, team: dominant, progress: state.progress, required: CAPTURE_TICKS })
     }
   }
 }
