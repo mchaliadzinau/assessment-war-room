@@ -28,7 +28,7 @@ export function initUnits(): void {
     Position.x[eid] = Math.random() * BATTLEFIELD_W
     Position.y[eid] = Math.random() * BATTLEFIELD_H
     Health.max[eid] = 100
-    Health.current[eid] = Math.floor(Math.random() * 101)
+    Health.current[eid] = 100 // to simulate a battlefield mid-engagement: Math.floor(Math.random() * 101)
     TeamComp.id[eid] = i < UNITS_TEAM_A_COUNT ? TEAM.A : TEAM.B
     StatusComp.value[eid] = STATUS.IDLE
     UnitMeta.nameIndex[eid] = eid

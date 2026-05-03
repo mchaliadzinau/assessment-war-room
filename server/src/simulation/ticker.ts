@@ -52,7 +52,7 @@ export class Ticker extends EventEmitter {
       runAttackSystem(dirty, events, attackCount)
       runIdleSystem(dirty, idleCount)
       runCaptureSystem(events)
-      runHealSystem(dirty)
+      runHealSystem(dirty, events)
 
       const payload: TickPayload = {
         seq: this.seq++,
