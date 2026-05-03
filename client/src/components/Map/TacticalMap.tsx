@@ -33,7 +33,8 @@ export function TacticalMap() {
 
       app = new PIXI.Application()
       await app.init({
-        resizeTo: el,
+        width: el.clientWidth,
+        height: el.clientHeight,
         backgroundColor: 0x0a0a0f,
         antialias: false,
         resolution: window.devicePixelRatio ?? 1,
@@ -48,7 +49,9 @@ export function TacticalMap() {
         return
       }
 
-      el.appendChild(app.canvas as HTMLCanvasElement)
+      const canvas = app.canvas as HTMLCanvasElement
+      canvas.style.display = 'block'
+      el.appendChild(canvas)
 
       // Build dot texture via Graphics
       const g = new PIXI.Graphics()
@@ -121,6 +124,7 @@ export function TacticalMap() {
         if (!app) return
         const { width, height } = entries[0].contentRect
         if (width === 0 || height === 0) return
+        app.renderer.resize(width, height)
         scaleX = width  / MAP_W
         scaleY = height / MAP_H
         const { units, filter } = useStore.getState()
@@ -141,8 +145,7 @@ export function TacticalMap() {
       if (ro) ro.disconnect()
       if (unsubUnits) unsubUnits()
       if (unsubZones) unsubZones()
-      // TODO fix Uncaught TypeError: this._cancelResize is not a function
-      // if (app) app.destroy(true)
+      if (app) app.destroy(true)
     }
   }, [])
 
