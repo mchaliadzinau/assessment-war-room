@@ -1,15 +1,39 @@
 import { Position, StatusComp, TeamComp } from './world.js'
 import { STATUS, TEAM } from '../types.js'
 import type { ZoneDefinition, ZoneState, GameEvent } from '../types.js'
+import { BATTLEFIELD_W, BATTLEFIELD_H } from './init.js'
 
-export const ZONES: ZoneDefinition[] = [
-  { id: 0, cx: 400,  cy: 400,  r: 120, label: 'Alpha Point' },
-  { id: 1, cx: 1600, cy: 400,  r: 120, label: 'Bravo Point' },
-  { id: 2, cx: 1000, cy: 1000, r: 150, label: 'Centre' },
-  { id: 3, cx: 400,  cy: 1600, r: 120, label: 'Delta Point' },
-  { id: 4, cx: 1600, cy: 1600, r: 120, label: 'Echo Point' },
-  { id: 5, cx: 1000, cy: 400,  r: 100, label: 'Foxtrot Point' },
+// Zone positions as fractions of battlefield dimensions; r as fraction of shorter axis
+type RelativeZone = { cx: number; cy: number; r: number; label: string }
+const DEFAULT_ZONES: RelativeZone[] = [
+  { cx: 0.20, cy: 0.20, r: 0.060, label: 'Alpha Point' },
+  { cx: 0.80, cy: 0.20, r: 0.060, label: 'Bravo Point' },
+  { cx: 0.50, cy: 0.50, r: 0.075, label: 'Centre' },
+  { cx: 0.20, cy: 0.80, r: 0.060, label: 'Delta Point' },
+  { cx: 0.80, cy: 0.80, r: 0.060, label: 'Echo Point' },
+  { cx: 0.50, cy: 0.20, r: 0.050, label: 'Foxtrot Point' },
 ]
+
+function buildZones(): ZoneDefinition[] {
+  if (process.env.ZONES_JSON) {
+    try {
+      const raw = JSON.parse(process.env.ZONES_JSON) as Omit<ZoneDefinition, 'id'>[]
+      return raw.map((z, i) => ({ ...z, id: i }))
+    } catch {
+      console.warn('[capture] ZONES_JSON parse failed — using scaled defaults')
+    }
+  }
+  const rScale = Math.min(BATTLEFIELD_W, BATTLEFIELD_H)
+  return DEFAULT_ZONES.map((z, i) => ({
+    id: i,
+    cx: Math.round(z.cx * BATTLEFIELD_W),
+    cy: Math.round(z.cy * BATTLEFIELD_H),
+    r:  Math.round(z.r  * rScale),
+    label: z.label,
+  }))
+}
+
+export const ZONES: ZoneDefinition[] = buildZones()
 
 export const zoneStates: ZoneState[] = ZONES.map(z => ({ id: z.id, team: null, progress: 0 }))
 

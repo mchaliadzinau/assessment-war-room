@@ -9,6 +9,7 @@ export default defineConfig({
       '/units':  'http://localhost:3001',
       '/zones':  'http://localhost:3001',
       '/health': 'http://localhost:3001',
+      '/config': 'http://localhost:3001',
     },
   },
   test: {

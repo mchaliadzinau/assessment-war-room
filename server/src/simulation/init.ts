@@ -8,7 +8,10 @@ export const allEntities: number[] = []
 let initialised = false
 
 const UNITS_TOTAL = Math.max(1, parseInt(process.env.UNITS_TOTAL ?? '20000', 10))
-const TEAM_A_UNITS = Math.max(0, parseInt(process.env.TEAM_A_UNITS ?? String(Math.floor(UNITS_TOTAL / 2)), 10))
+const UNITS_TEAM_A_COUNT = Math.max(0, parseInt(process.env.UNITS_TEAM_A_COUNT ?? String(Math.floor(UNITS_TOTAL / 2)), 10))
+const BATTLEFIELD_MAX = 10_000
+export const BATTLEFIELD_W = Math.min(Number(process.env.BATTLEFIELD_W ?? 2000), BATTLEFIELD_MAX)
+export const BATTLEFIELD_H = Math.min(Number(process.env.BATTLEFIELD_H ?? 2000), BATTLEFIELD_MAX)
 
 export function initUnits(): void {
   if (initialised) throw new Error('initUnits already called')
@@ -22,11 +25,11 @@ export function initUnits(): void {
     addComponent(world, StatusComp, eid)
     addComponent(world, UnitMeta, eid)
 
-    Position.x[eid] = Math.random() * 2000
-    Position.y[eid] = Math.random() * 2000
+    Position.x[eid] = Math.random() * BATTLEFIELD_W
+    Position.y[eid] = Math.random() * BATTLEFIELD_H
     Health.max[eid] = 100
     Health.current[eid] = Math.floor(Math.random() * 101)
-    TeamComp.id[eid] = i < TEAM_A_UNITS ? TEAM.A : TEAM.B
+    TeamComp.id[eid] = i < UNITS_TEAM_A_COUNT ? TEAM.A : TEAM.B
     StatusComp.value[eid] = STATUS.IDLE
     UnitMeta.nameIndex[eid] = eid
 

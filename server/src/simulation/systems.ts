@@ -1,7 +1,10 @@
 import { Position, Health, TeamComp, StatusComp } from './world.js'
-import { liveEntities } from './init.js'
+import { liveEntities, BATTLEFIELD_W, BATTLEFIELD_H } from './init.js'
 import { STATUS } from '../types.js'
 import type { GameEvent } from '../types.js'
+
+const UNITS_ATTACK_RADIUS_MAX = 500
+export const UNITS_ATTACK_RADIUS = Math.min(Number(process.env.UNITS_ATTACK_RADIUS ?? 200), UNITS_ATTACK_RADIUS_MAX)
 
 function pickRandom(arr: number[], count: number): number[] {
   const actual = Math.min(count, arr.length)
@@ -15,14 +18,14 @@ function pickRandom(arr: number[], count: number): number[] {
 
 export function runMoveSystem(dirty: Set<number>, count: number): void {
   for (const eid of pickRandom(liveEntities, count)) {
-    Position.x[eid] = Math.max(0, Math.min(2000, Position.x[eid] + (Math.random() - 0.5) * 20))
-    Position.y[eid] = Math.max(0, Math.min(2000, Position.y[eid] + (Math.random() - 0.5) * 20))
+    Position.x[eid] = Math.max(0, Math.min(BATTLEFIELD_W, Position.x[eid] + (Math.random() - 0.5) * 20))
+    Position.y[eid] = Math.max(0, Math.min(BATTLEFIELD_H, Position.y[eid] + (Math.random() - 0.5) * 20))
     StatusComp.value[eid] = STATUS.MOVING
     dirty.add(eid)
   }
 }
 
-export function runAttackSystem(dirty: Set<number>, events: GameEvent[], count: number): void {
+export function runAttackSystem(dirty: Set<number>, events: GameEvent[], count: number, radius = UNITS_ATTACK_RADIUS): void {
   const attackers = pickRandom(liveEntities, count)
   for (const attacker of attackers) {
     const ax = Position.x[attacker]
@@ -37,7 +40,7 @@ export function runAttackSystem(dirty: Set<number>, events: GameEvent[], count: 
       const dx = Position.x[i] - ax
       const dy = Position.y[i] - ay
       const dist = Math.sqrt(dx * dx + dy * dy)
-      if (dist < 200 && dist < nearestDist) {
+      if (dist < radius && dist < nearestDist) {
         nearestDist = dist
         target = i
       }

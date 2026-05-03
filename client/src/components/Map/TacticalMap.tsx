@@ -13,9 +13,6 @@ function matchesFilter(unit: Unit, f: FilterState): boolean {
   return true
 }
 
-const MAP_W = 2000
-const MAP_H = 2000
-
 export function TacticalMap() {
   const canvasRef = useRef<HTMLDivElement>(null)
 
@@ -30,6 +27,10 @@ export function TacticalMap() {
     let ro: ResizeObserver | null = null
 
     ;(async () => {
+      const cfg = await fetch('/config').then(r => r.json()) as { battlefieldW: number; battlefieldH: number }
+      const MAP_W: number = cfg.battlefieldW
+      const MAP_H: number = cfg.battlefieldH
+
       app = new PIXI.Application()
       await app.init({
         resizeTo: el,
