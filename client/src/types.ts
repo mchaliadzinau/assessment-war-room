@@ -24,9 +24,12 @@ export type UnitDelta = {
 }
 
 export type GameEvent =
-  | { type: 'attack';    attacker: number; target: number; ts: number }
-  | { type: 'destroyed'; unit: number; team: Team; ts: number }
-  | { type: 'capture';   zone: number; team: Team; ts: number }
+  | { type: 'attack';     attacker: number; target: number; ts: number }
+  | { type: 'destroyed';  unit: number; team: Team; ts: number }
+  | { type: 'capture';    zone: number; team: Team; ts: number }
+  | { type: 'capturing';  zone: number; team: Team; progress: number; required: number; ts: number }
+  | { type: 'contesting'; zone: number; progress: number; ts: number }
+  | { type: 'heal';       unit: number; amount: number; ts: number }
 
 export type ZoneState = {
   id: number

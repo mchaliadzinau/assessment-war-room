@@ -73,7 +73,7 @@ export const useStore = create<StoreState>()(subscribeWithSelector((set) => ({
   // Events slice
   events: [],
   pushEvents: (incoming) => set((state) => ({
-    events: [...incoming, ...state.events].slice(0, 200),
+    events: [...incoming, ...state.events].slice(0, 1000),
   })),
 
   // Perf slice
