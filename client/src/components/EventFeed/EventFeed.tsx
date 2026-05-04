@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useStore } from '../../store/index'
 import { TEAM } from '../../types'
 import type { GameEvent } from '../../types'
@@ -30,21 +30,61 @@ const EVENT_COLORS: Record<GameEvent['type'], string> = {
 export function EventFeed() {
   const events = useStore(s => s.events)
   const topRef = useRef<HTMLDivElement>(null)
+  const [filterType, setFilterType] = useState<GameEvent['type'] | 'all'>('all')
+
+  const filtered = filterType === 'all'
+    ? events
+    : events.filter(e => e.type === filterType)
 
   useEffect(() => {
     topRef.current?.scrollIntoView({ behavior: 'instant' })
-  }, [events.length])
+  }, [filtered.length])
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', height: '200px', overflow: 'hidden',
       background: '#0a0a0a', borderTop: '1px solid #222' }}>
-      <div style={{ padding: '0.3rem 0.5rem', color: '#666', fontSize: '0.7rem',
-        borderBottom: '1px solid #1a1a1a', fontFamily: 'monospace' }}>
-        EVENT FEED ({events.length})
+      <div style={{
+        display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+        padding: '0.3rem 0.5rem', borderBottom: '1px solid #1a1a1a',
+        fontFamily: 'monospace', fontSize: '0.7rem', color: '#666',
+      }}>
+        <span>EVENT FEED ({filtered.length})</span>
+        <div style={{ display: 'flex', gap: '0.4rem', alignItems: 'center' }}>
+          <select
+            value={filterType}
+            onChange={e => setFilterType(e.target.value as GameEvent['type'] | 'all')}
+            style={{
+              background: '#111', color: '#aaa', border: '1px solid #333',
+              fontSize: '0.65rem', padding: '1px 4px', fontFamily: 'monospace',
+              cursor: 'pointer',
+            }}
+          >
+            <option value="all">All</option>
+            <option value="attack">Attack</option>
+            <option value="destroyed">Destroyed</option>
+            <option value="capture">Capture</option>
+            <option value="capturing">Capturing</option>
+            <option value="contesting">Contesting</option>
+            <option value="heal">Heal</option>
+          </select>
+          <button
+            onClick={() => {
+              const text = filtered.map(formatEvent).join('\n')
+              navigator.clipboard.writeText(text).catch(() => {})
+            }}
+            style={{
+              background: '#1a1a1a', color: '#aaa', border: '1px solid #333',
+              fontSize: '0.65rem', padding: '1px 6px', fontFamily: 'monospace',
+              cursor: 'pointer',
+            }}
+          >
+            copy
+          </button>
+        </div>
       </div>
       <div style={{ flex: 1, overflow: 'auto', fontFamily: 'monospace', fontSize: '0.7rem' }}>
         <div ref={topRef} />
-        {events.map((e, i) => (
+        {filtered.map((e, i) => (
           <div key={i} style={{ padding: '2px 0.5rem', color: EVENT_COLORS[e.type], borderBottom: '1px solid #111' }}>
             {formatEvent(e)}
           </div>
