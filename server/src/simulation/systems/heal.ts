@@ -30,6 +30,7 @@ export function runHealSystem(dirty: Set<number>, events: GameEvent[]): void {
       const dy = py - zone.cy
       if (dx * dx + dy * dy <= zone.r * zone.r) {
         const healed = Math.min(HEAL_AMOUNT, Health.max[eid] - Health.current[eid])
+        if (healed <= 0) break
         Health.current[eid] += healed
         dirty.add(eid)
         events.push({ type: 'heal', unit: eid, amount: healed })
