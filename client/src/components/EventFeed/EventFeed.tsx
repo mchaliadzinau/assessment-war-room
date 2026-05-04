@@ -5,16 +5,22 @@ import type { GameEvent } from '../../types'
 
 function formatEvent(e: GameEvent): string {
   switch (e.type) {
-    case 'attack':    return `Unit ${e.attacker} attacked Unit ${e.target}`
-    case 'destroyed': return `Unit ${e.unit} (Team ${e.team === TEAM.A ? 'A' : 'B'}) destroyed`
-    case 'capture':   return `Team ${e.team === TEAM.A ? 'A' : 'B'} captured Zone ${e.zone}`
+    case 'attack':     return `Unit ${e.attacker} attacked Unit ${e.target}`
+    case 'destroyed':  return `Unit ${e.unit} (Team ${e.team === TEAM.A ? 'A' : 'B'}) destroyed`
+    case 'capture':    return `Team ${e.team === TEAM.A ? 'A' : 'B'} captured Zone ${e.zone}`
+    case 'capturing':  return `Team ${e.team === TEAM.A ? 'A' : 'B'} capturing Zone ${e.zone} (${e.progress}/${e.required})`
+    case 'contesting': return `Zone ${e.zone} contested`
+    case 'heal':       return `Unit ${e.unit} healed +${e.amount} HP`
   }
 }
 
 const EVENT_COLORS: Record<GameEvent['type'], string> = {
-  attack: '#aaa',
-  destroyed: '#ff6666',
-  capture: '#66aaff',
+  attack:     '#aaa',
+  destroyed:  '#ff6666',
+  capture:    '#66aaff',
+  capturing:  '#66aaff',
+  contesting: '#ffaa44',
+  heal:       '#66ff99',
 }
 
 export function EventFeed() {
