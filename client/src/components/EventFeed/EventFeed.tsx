@@ -85,7 +85,7 @@ export function EventFeed() {
       <div style={{ flex: 1, overflow: 'auto', fontFamily: 'monospace', fontSize: '0.7rem' }}>
         <div ref={topRef} />
         {filtered.map((e, i) => (
-          <div key={i} style={{ padding: '2px 0.5rem', color: EVENT_COLORS[e.type], borderBottom: '1px solid #111' }}>
+          <div key={`${e.type}-${e.ts}-${i}`} style={{ padding: '2px 0.5rem', color: EVENT_COLORS[e.type], borderBottom: '1px solid #111' }}>
             {formatEvent(e)}
           </div>
         ))}
