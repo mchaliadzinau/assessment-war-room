@@ -11,6 +11,10 @@ function formatEvent(e: GameEvent): string {
     case 'capturing':  return `Team ${e.team === TEAM.A ? 'A' : 'B'} capturing Zone ${e.zone} (${e.progress}/${e.required})`
     case 'contesting': return `Zone ${e.zone} contested`
     case 'heal':       return `Unit ${e.unit} healed +${e.amount} HP`
+    default: {
+      const _never: never = e
+      return `Unknown event`
+    }
   }
 }
 
