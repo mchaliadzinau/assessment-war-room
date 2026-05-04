@@ -28,6 +28,7 @@ export function runMoveSystem(dirty: Set<number>, count: number): void {
 export function runAttackSystem(dirty: Set<number>, events: GameEvent[], count: number, radius = UNITS_ATTACK_RADIUS): void {
   const attackers = pickRandom(liveEntities, count)
   for (const attacker of attackers) {
+    if (StatusComp.value[attacker] === STATUS.DEAD) continue
     const ax = Position.x[attacker]
     const ay = Position.y[attacker]
     const attackerTeam = TeamComp.id[attacker]
