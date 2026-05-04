@@ -16,7 +16,9 @@ interface UnitsSlice {
 
 interface EventsSlice {
   events: GameEvent[]
+  maxEvents: number
   pushEvents: (e: GameEvent[]) => void
+  setMaxEvents: (n: number) => void
 }
 
 type PerfKey = 'fps' | 'frameTime' | 'heapMb' | 'apiLatencyMs' | 'storeUpdatesPerSec' | '_updateCount'
@@ -72,8 +74,13 @@ export const useStore = create<StoreState>()(subscribeWithSelector((set) => ({
 
   // Events slice
   events: [],
+  maxEvents: 1000,
   pushEvents: (incoming) => set((state) => ({
-    events: [...incoming, ...state.events].slice(0, 1000),
+    events: [...incoming, ...state.events].slice(0, state.maxEvents),
+  })),
+  setMaxEvents: (n) => set((state) => ({
+    maxEvents: n,
+    events: state.events.slice(0, n),
   })),
 
   // Perf slice
