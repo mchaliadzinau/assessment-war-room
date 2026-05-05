@@ -1,14 +1,13 @@
 # War Room
 ## Game logic
-### Attacking
-- Each tick 35% of updated units per tick become attackers. Nearest enemy unit is selected (within UNITS_ATTACK_RADIUS) and receives damage.
-### Capturing
-- For each zone, count alive units inside its radius (be default 6 circular zones are precreated based on hardcoded logic and size of the battlefield but can be overriden in `.env`).
-- If **No units present** → no change to progress or ownership.
-- If **Contested** (there are units of both teams) → `progress` decrements by CAPTURE_CONTEST_PENALTY, min 0.
-- If **Uncontested** (exactly one team present): that team is dominant. Team need to remain dominant for CAPTURE_TICKS to become the owner of the zone.
-### Healing
-- Units that remain idle for several consecutive ticks while inside a zone captured by their own team are healed each tick.
+- **Attacking** — 35% of units selected per tick become attackers. Each attacks the nearest enemy within `UNITS_ATTACK_RADIUS`.
+
+- **Capturing** — 6 circular zones by default (overridable via `.env`). Each tick, alive units inside each zone are counted:
+    - **Empty** → no change.
+    - **Contested** (both teams present) → `progress` decrements by `CAPTURE_CONTEST_PENALTY`, min 0.
+    - **Uncontested** (one team only) → `progress` increments. Zone captured after `CAPTURE_TICKS` consecutive uncontested ticks.  
+
+- **Healing** — idle units inside a friendly-owned zone are healed each tick after `HEAL_IDLE_TICKS` consecutive idle ticks.
 
 ## Setup
 
@@ -69,33 +68,28 @@ cd client && npm test
 
 ## Architecture Decisions
 
+This implementation is purpose-built for the given task, but with substantial headroom: up to 50,000 units at a 100ms tick on sufficiently powerful hardware. 
+Beyond that, a spatial index and transport replacement (e.g. WebRTC) become necessary. 
+Browser parallelisation via Web Workers is unlikely to yield meaningful gains — the bottleneck is thread communication overhead: typed arrays must either be copied (expensive) or transferred (the main thread loses access). At that scale a native application with a proper ECS is the more appropriate direction.
+
 ### Server
+- ECS with bitecs — 20,000 units stored in flat typed arrays via bitecs. Zero per-entity heap allocation in the hot path. Component access is O(1) (Position.x[eid]). 
+    - Each tick ±350 units are selected via Fisher-Yates partial shuffle; 35% become attackers, 50% movers, the rest idle.
+    - `liveEntities` array — shared number[] of non-dead entity IDs. All systems iterate this instead of all 20k slots. Shrinks naturally as units die.
+    - **Move system** — ~175 movers/tick. At 1s intervals each unit moves on average every ~114 ticks.
+    - **Attack system** — most expensive per tick. 175–227 attackers each scan all live units: worst case 227 × 20,000 = 4.54M comparisons. Each comparison is arithmetic only. ~5ms of the 1,000ms tick budget (0.5%). Spatial index not necessary at this scale; straightforward to add later since systems are isolated.
+    - **Capture system** — 6 zones × 20k units = 120k comparisons/tick. Negligible.
+    - **Heal system** — only fires for IDLE units with ≥ HEAL_IDLE_TICKS consecutive idle ticks. Worst case 20k × 6 = 120k zone checks.
 
-- **ECS with bitecs** — 20,000 units are stored in flat typed arrays (`Float32Array`, `Int32Array`, avoids strings in ECS) via the bitecs entity-component system. Zero per-entity heap allocation in the hot path. Access: `Position.x[eid]` → O(1). This keeps GC pressure negligible and tick throughput high even at 10 Hz. Each tick ±350 units are selected for update, 35% becomes attackers, 50% moves and the rest becomes idle (the distribution is uniform thanks to Fisher-Yates shuffle):
-    - Move system: with 20,000 live units and 50%(~175) movers per tick at 1s intervals, each unit gets a move turn on average every ~114 seconds. 
-    - Attack system is the most resource heavy one (most comparisons per tick of any system) but it should run well at 1s tick:
-      O(n) scan for attack target lookup is ~3.5–4.5M comparisons/tick. Only 35% of `UNITS_PER_TICK` (500) become attackers — 175–227 per tick depending on jitter. Each scans all live units: 227 × 20,000 = 4.54M comparisons worst case. A single comparison is just arithmetic + one `Math.sqrt`. Modern JS engines execute these at roughly 1 billion simple operations per second; spending ~5ms of the 1,000ms tick budget on this is 0.5%.
-      Optimizations like Spatial Index is not necessary at this point, but should be relatively easy to implement given that systems are isolated.
-    - Capture system's zone membership check (6 × 20k = 120k comparisons) is an order of magnitude cheaper than the Attack system.
-    - Heal system: the inner zone loop (6 iterations) only fires for units that are IDLE and have accumulated ≥ HEAL_IDLE_TICKS consecutive idle ticks. In the worst case all 20,000 units idle and eligible: 20,000 × 6 = 120,000 zone distance checks.
-- **`liveEntities` shared array** — a single mutable `number[]` holds every non-dead entity ID. All three systems (move, attack, idle/heal) iterate over this instead of scanning all 20k slots each tick. When a unit dies, the attack system splices it out immediately, keeping the iteration set small as the battle progresses.
-
-- **Delta-only SSE transport** — on connect the client receives a full snapshot (~20k units, sent once). Every subsequent tick carries only the 200–350 entity IDs whose state actually changed (`UnitDelta[]`). This keeps the per-tick payload well under 20 KB regardless of unit count.
-
-- **Ticker as EventEmitter** — the 1 Hz tick loop lives in a dedicated `Ticker` class that emits `'tick'` events. Each tick is wrapped in try/catch so a single bad frame cannot kill the interval. The SSE handler simply subscribes to the emitter; transport and simulation are fully decoupled.
-
-- **Zod input validation** — all query parameters (filter endpoints, SSE params) are validated with Zod schemas. `hpMin`/`hpMax` cross-field validation returns HTTP 400 before touching simulation state.
+- Delta-only SSE — full snapshot sent once on connect. Each tick carries only changed units (200–350 UnitDelta entries, < 20 KB/tick).
+- Ticker as EventEmitter — tick loop emits 'tick' events. Each tick wrapped in try/catch so one bad frame cannot kill the interval. SSE handler subscribes to the emitter; transport and simulation are fully decoupled.
+- Zod validation — all query params validated at the edge. Cross-field hpMin/hpMax validation returns HTTP 400 before touching simulation state.
 
 ### Client
+- PixiJS ParticleContainer — all 20,000 units rendered as sprites in one WebGL draw call per frame. DOM rendering explicitly avoided.
+- Zustand with new Map references — `applyDeltas` always produces a new Map so useMemo and useStore.subscribe fire reliably. PixiJS subscriber bypasses React's render cycle; only KPIs and unit list trigger re-renders.
+- TanStack Virtual — unit list renders ~15 rows at a time regardless of filtered subset size.
+- ResizeObserver + autoDensity — canvas resizes via ResizeObserver; recalculates scale and repositions all particles in one pass. autoDensity: true with resolution: devicePixelRatio for sharp retina rendering.
+usePerf at 2 Hz — FPS and heap sampled at 60 Hz into refs, flushed to the store every 500ms. At most 2 re-renders/second from the perf panel.
+- No RegExp on user input — search uses String.prototype.includes(). new RegExp(userInput) is never called, eliminating ReDoS exposure.
 
-- **PixiJS ParticleContainer** — all 20,000 units are rendered as `PIXI.Particle` sprites in a single `ParticleContainer`, which issues one WebGL draw call per frame. DOM rendering for map dots is explicitly avoided; at this scale it would be unusable.
-
-- **`ResizeObserver` + `autoDensity`** — canvas sizing is driven by a `ResizeObserver`: on every resize it calls `app.renderer.resize`, then recalculates `scaleX`/`scaleY` and repositions all particles in one pass. `autoDensity: true` combined with `resolution: devicePixelRatio` produces sharp rendering on retina displays.
-
-- **Zustand store with new Map references** — `applyDeltas` always produces a `new Map(state.units)` so both React `useMemo` hooks and PixiJS's `useStore.subscribe` fire reliably on every tick. The PixiJS subscriber bypasses React's render cycle entirely — only KPI counts and the unit list trigger React re-renders.
-
-- **TanStack Virtual for the unit list** — the 20k-row list renders only ~15 rows at a time. Filtering and sorting are applied inside a `useMemo`; the virtualiser never sees more rows than the filtered subset.
-
-- **`usePerf` at 2 Hz** — FPS and heap samples are accumulated into refs at 60 Hz but flushed to the Zustand store only every 500 ms. This means the perf panel causes at most 2 React re-renders per second instead of 60.
-
-- **No RegExp on user input** — the unit search filter uses `String.prototype.includes()` throughout. `new RegExp(userInput)` is never called, eliminating ReDoS exposure.
