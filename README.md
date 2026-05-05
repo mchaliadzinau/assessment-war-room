@@ -1,4 +1,7 @@
 # War Room
+
+<img src='./screenshot.png'/>
+
 ## Game logic
 - **Attacking** — 35% of units selected per tick become attackers. Each attacks the nearest enemy within `UNITS_ATTACK_RADIUS`.
 
